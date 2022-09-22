@@ -21,4 +21,4 @@ sudo docker push dessalines/torrents-csv-server:$new_tag
 sudo docker push dessalines/torrents-csv-server:latest
 
 # SSH and pull it
-ssh tyler@107.170.69.217 "cd ~/git/torrents-csv-server && docker-compose pull && docker-compose up -d"
+ssh tyler@95.183.53.52 "cd ~/torrents-csv-server && docker-compose pull && docker-compose up -d"
