@@ -1,7 +1,7 @@
 ARG RUST_BUILDER_IMAGE=clux/muslrust:stable
 
 # Front end
-FROM node:10-jessie as node
+FROM node:alpine as node
 WORKDIR /app/ui
 
 # Cache deps
@@ -13,7 +13,7 @@ COPY ./ui /app/ui
 RUN yarn build
 
 # Build the torrents.db file
-FROM alpine:3.14 as db_file_builder
+FROM alpine:3 as db_file_builder
 WORKDIR /app
 RUN apk add sed sqlite bash coreutils
 COPY ./data ./data
