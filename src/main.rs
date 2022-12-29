@@ -107,10 +107,10 @@ fn search_query(
 
   let res = if type_ == "file" {
     let results = torrent_file_search(conn, q, size, offset)?;
-    serde_json::to_value(&results)?
+    serde_json::to_value(results)?
   } else {
     let results = torrent_search(conn, q, size, offset)?;
-    serde_json::to_value(&results)?
+    serde_json::to_value(results)?
   };
 
   Ok(res)
