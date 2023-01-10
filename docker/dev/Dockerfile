@@ -13,11 +13,10 @@ RUN yarn build
 
 # Build the torrents.db file
 FROM alpine:3 as db_file_builder
+RUN apk add sqlite bash
 WORKDIR /app
-RUN apk add sed sqlite bash coreutils
-COPY ./data ./data
-COPY ./build_sqlite.sh .
-RUN ./build_sqlite.sh
+COPY ./data .
+RUN ./import_to_sqlite.sh
 
 FROM $RUST_BUILDER_IMAGE as chef
 USER root

@@ -14,7 +14,6 @@ use actix_web::{middleware, web, web::Data, App, HttpResponse, HttpServer};
 use anyhow::{anyhow, Error};
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::params;
-use serde_json::Value;
 use std::{cmp, env, io, ops::Deref};
 
 const DEFAULT_SIZE: usize = 25;
@@ -89,7 +88,7 @@ async fn search(
 fn search_query(
   query: web::Query<SearchQuery>,
   conn: r2d2::PooledConnection<SqliteConnectionManager>,
-) -> Result<Value, Error> {
+) -> Result<Vec<Torrent>, Error> {
   let q = query.q.trim();
   if q.is_empty() || q.len() < 3 || q == "2020" {
     return Err(anyhow!("{{\"error\": \"{}\"}}", "Empty query".to_string()));
@@ -105,15 +104,7 @@ fn search_query(
     q, type_, page, size
   );
 
-  let res = if type_ == "file" {
-    let results = torrent_file_search(conn, q, size, offset)?;
-    serde_json::to_value(results)?
-  } else {
-    let results = torrent_search(conn, q, size, offset)?;
-    serde_json::to_value(results)?
-  };
-
-  Ok(res)
+  torrent_search(conn, q, size, offset)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -134,7 +125,8 @@ fn torrent_search(
   size: usize,
   offset: usize,
 ) -> Result<Vec<Torrent>, Error> {
-  let stmt_str = "select * from torrents where name like '%' || ?1 || '%' limit ?2, ?3";
+  let stmt_str =
+    "select * from torrent where name like '%' || ?1 || '%' order by seeders desc limit ?2, ?3";
   let mut stmt = conn.prepare(stmt_str)?;
   let torrent_iter = stmt.query_map(
     params![
@@ -161,55 +153,6 @@ fn torrent_search(
     torrents.push(torrent?);
   }
   Ok(torrents)
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct File {
-  infohash: String,
-  index_: u32,
-  path: String,
-  size_bytes: isize,
-  created_unix: u32,
-  seeders: u32,
-  leechers: u32,
-  completed: Option<u32>,
-  scraped_date: u32,
-}
-
-fn torrent_file_search(
-  conn: r2d2::PooledConnection<SqliteConnectionManager>,
-  query: &str,
-  size: usize,
-  offset: usize,
-) -> Result<Vec<File>, Error> {
-  let stmt_str = "select * from files where path like '%' || ?1 || '%' limit ?2, ?3";
-  let mut stmt = conn.prepare(stmt_str)?;
-  let file_iter = stmt.query_map(
-    params![
-      query.replace(' ', "%"),
-      offset.to_string(),
-      size.to_string(),
-    ],
-    |row| {
-      Ok(File {
-        infohash: row.get(0)?,
-        index_: row.get(1)?,
-        path: row.get(2)?,
-        size_bytes: row.get(3)?,
-        created_unix: row.get(4)?,
-        seeders: row.get(5)?,
-        leechers: row.get(6)?,
-        completed: row.get(7)?,
-        scraped_date: row.get(8)?,
-      })
-    },
-  )?;
-
-  let mut files = Vec::new();
-  for file in file_iter {
-    files.push(file?);
-  }
-  Ok(files)
 }
 
 #[cfg(test)]

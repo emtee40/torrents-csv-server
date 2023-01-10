@@ -23,7 +23,7 @@ Made with [Rust](https://www.rust-lang.org), [ripgrep](https://github.com/BurntS
 ### Docker
 
 ```
-wget https://codeberg.org/heretic/torrents-csv-server/raw/branch/main/docker/prod/docker-compose.yml
+wget https://git.torrents-csv.ml/heretic/torrents-csv-server/raw/branch/main/docker/prod/docker-compose.yml
 docker-compose up -d
 ```
 
@@ -32,7 +32,7 @@ And goto http://localhost:8902
 ### Docker Development
 
 ```
-git clone --recurse-submodules https://codeberg.org/heretic/torrents-csv-server
+git clone --recurse-submodules https://git.torrents-csv.ml/heretic/torrents-csv-server
 cd torrents-csv-server/docker/dev
 ./docker_update.sh
 ```
@@ -46,7 +46,7 @@ cd torrents-csv-server/docker/dev
 ### Running
 
 ```
-git clone --recurse-submodules https://codeberg.org/heretic/torrents-csv-server
+git clone --recurse-submodules https://git.torrents-csv.ml/heretic/torrents-csv-server
 cd torrents-csv-server
 ./search.sh "bleh season 1"
 bleh season 1 (1993-)
