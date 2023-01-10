@@ -4,7 +4,7 @@
 
 [Demo Server](https://torrents-csv.ml)
 
-`Torrents.csv` is a *collaborative* repository of torrents and their files, consisting of a searchable `torrents.csv`, and `torrent_files.csv`. With it you can search for torrents, or files within torrents. It aims to be a universal file system for popular data.
+`Torrents.csv` is a _collaborative_ repository of torrents and their files, consisting of a searchable `torrents.csv`, and `torrent_files.csv`. With it you can search for torrents, or files within torrents. It aims to be a universal file system for popular data.
 
 Its initially populated with a January 2017 backup of the pirate bay, and new torrents are periodically added from various torrents sites. It comes with a self-hostable [Torrents.csv webserver](https://torrents-csv.ml), a command line search, and a folder scanner to add torrents, and their files.
 
@@ -12,7 +12,7 @@ Its initially populated with a January 2017 backup of the pirate bay, and new to
 
 ![img](https://i.imgur.com/yTFuwpv.png)
 
-To request more torrents, or add your own, go [here](https://gitea.com/heretic/torrents-csv-data).
+To request more torrents, or add your own, go [here](https://git.torrents-csv.ml/heretic/torrents-csv-data).
 
 Made with [Rust](https://www.rust-lang.org), [ripgrep](https://github.com/BurntSushi/ripgrep), [Actix](https://actix.rs/), [Inferno](https://www.infernojs.org), [Typescript](https://www.typescriptlang.org/).
 
@@ -64,4 +64,3 @@ A JSON output of search results is available at:
 New torrents are at:
 
 `http://localhost:8902/service/new?size=[NUMBER_OF_RESULTS]&page=[PAGE]&type=[torrent | file]`
-
