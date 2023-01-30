@@ -4,17 +4,15 @@ extern crate serde;
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
-extern crate r2d2;
-extern crate r2d2_sqlite;
 extern crate rusqlite;
 
 use actix_files as fs;
 use actix_files::NamedFile;
-use actix_web::{middleware, web, web::Data, App, HttpResponse, HttpServer};
-use anyhow::{anyhow, Error};
-use r2d2_sqlite::SqliteConnectionManager;
+use actix_web::{middleware, web, App, HttpResponse, HttpServer};
+use anyhow::{anyhow, Result};
 use rusqlite::params;
-use std::{cmp, env, io, ops::Deref};
+use std::{cmp, env, io, ops::Deref, path::Path};
+use tokio_rusqlite::Connection;
 
 const DEFAULT_SIZE: usize = 25;
 
@@ -24,12 +22,8 @@ async fn main() -> io::Result<()> {
   std::env::set_var("RUST_LOG", "actix_web=debug");
   env_logger::init();
 
-  let manager = SqliteConnectionManager::file(torrents_db_file());
-  let pool = r2d2::Pool::builder().max_size(15).build(manager).unwrap();
-
   HttpServer::new(move || {
     App::new()
-      .app_data(Data::new(pool.clone()))
       .wrap(middleware::Logger::default())
       .service(fs::Files::new("/static", front_end_dir()))
       .route("/", web::get().to(index))
@@ -65,30 +59,22 @@ struct SearchQuery {
   type_: Option<String>,
 }
 
-async fn search(
-  db: web::Data<r2d2::Pool<SqliteConnectionManager>>,
-  query: web::Query<SearchQuery>,
-) -> Result<HttpResponse, actix_web::Error> {
-  let res = web::block(move || {
-    let conn = db.get().unwrap();
-
-    // TODO can't get errors to propagate correctly
-    search_query(query, conn).unwrap()
-  })
-  .await
-  .map(|body| {
-    HttpResponse::Ok()
-      .append_header(("Access-Control-Allow-Origin", "*"))
-      .json(body)
-  })
-  .map_err(actix_web::error::ErrorBadRequest)?;
+async fn search(query: web::Query<SearchQuery>) -> Result<HttpResponse, actix_web::Error> {
+  let conn = Connection::open(Path::new(&torrents_db_file()))
+    .await
+    .map_err(actix_web::error::ErrorBadRequest)?;
+  let res = search_query(query, conn)
+    .await
+    .map(|body| {
+      HttpResponse::Ok()
+        .append_header(("Access-Control-Allow-Origin", "*"))
+        .json(body)
+    })
+    .map_err(actix_web::error::ErrorBadRequest)?;
   Ok(res)
 }
 
-fn search_query(
-  query: web::Query<SearchQuery>,
-  conn: r2d2::PooledConnection<SqliteConnectionManager>,
-) -> Result<Vec<Torrent>, Error> {
+async fn search_query(query: web::Query<SearchQuery>, conn: Connection) -> Result<Vec<Torrent>> {
   let q = query.q.trim();
   if q.is_empty() || q.len() < 3 || q == "2020" {
     return Err(anyhow!("{{\"error\": \"{}\"}}", "Empty query".to_string()));
@@ -99,12 +85,9 @@ fn search_query(
   let type_ = query.type_.as_ref().map_or("torrent", String::deref);
   let offset = size * (page - 1);
 
-  println!(
-    "query = {}, type = {}, page = {}, size = {}",
-    q, type_, page, size
-  );
+  println!("query = {q}, type = {type_}, page = {page}, size = {size}");
 
-  torrent_search(conn, q, size, offset)
+  torrent_search(conn, q, size, offset).await
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -119,53 +102,56 @@ struct Torrent {
   scraped_date: u32,
 }
 
-fn torrent_search(
-  conn: r2d2::PooledConnection<SqliteConnectionManager>,
+async fn torrent_search(
+  conn: Connection,
   query: &str,
   size: usize,
   offset: usize,
-) -> Result<Vec<Torrent>, Error> {
-  let stmt_str =
-    "select * from torrent where name like '%' || ?1 || '%' order by seeders desc limit ?2, ?3";
-  let mut stmt = conn.prepare(stmt_str)?;
-  let torrent_iter = stmt.query_map(
-    params![
-      query.replace(' ', "%"),
-      offset.to_string(),
-      size.to_string(),
-    ],
-    |row| {
-      Ok(Torrent {
-        infohash: row.get(0)?,
-        name: row.get(1)?,
-        size_bytes: row.get(2)?,
-        created_unix: row.get(3)?,
-        seeders: row.get(4)?,
-        leechers: row.get(5)?,
-        completed: row.get(6)?,
-        scraped_date: row.get(7)?,
-      })
-    },
-  )?;
+) -> Result<Vec<Torrent>> {
+  let q = query.to_owned();
+  let res = conn
+    .call(move |conn| {
+      let stmt_str =
+        "select * from torrent where name like '%' || ?1 || '%' order by seeders desc limit ?2, ?3";
 
-  let mut torrents = Vec::new();
-  for torrent in torrent_iter {
-    torrents.push(torrent?);
-  }
-  Ok(torrents)
+      let mut stmt = conn.prepare(stmt_str)?;
+      let torrents = stmt
+        .query_map(
+          params![q.replace(' ', "%"), offset.to_string(), size.to_string(),],
+          |row| {
+            Ok(Torrent {
+              infohash: row.get(0)?,
+              name: row.get(1)?,
+              size_bytes: row.get(2)?,
+              created_unix: row.get(3)?,
+              seeders: row.get(4)?,
+              leechers: row.get(5)?,
+              completed: row.get(6)?,
+              scraped_date: row.get(7)?,
+            })
+          },
+        )?
+        .collect::<Result<Vec<Torrent>, rusqlite::Error>>()?;
+
+      Ok::<_, rusqlite::Error>(torrents)
+    })
+    .await?;
+
+  Ok(res)
 }
 
 #[cfg(test)]
 mod tests {
-  use r2d2_sqlite::SqliteConnectionManager;
+  use crate::{torrent_search, torrents_db_file};
+  use std::path::Path;
+  use tokio_rusqlite::Connection;
 
-  #[test]
-  fn test() {
-    let manager = SqliteConnectionManager::file(super::torrents_db_file());
-    let pool = r2d2::Pool::builder().max_size(15).build(manager).unwrap();
-    let conn = pool.get().unwrap();
-    let results = super::torrent_search(conn, "sherlock", 10, 0);
-    assert!(results.unwrap().len() > 2);
-    // println!("Query took {:?} seconds.", end - start);
+  #[tokio::test]
+  async fn test() {
+    let conn = Connection::open(Path::new(&torrents_db_file()))
+      .await
+      .unwrap();
+    let results = torrent_search(conn, "sherlock", 10, 0).await.unwrap();
+    assert!(results.len() > 2);
   }
 }
