@@ -111,8 +111,7 @@ async fn torrent_search(
   let q = query.to_owned();
   let res = conn
     .call(move |conn| {
-      let stmt_str =
-        "select * from torrent where name like '%' || ?1 || '%' order by seeders desc limit ?2, ?3";
+      let stmt_str = "select * from torrent where name like '%' || ?1 || '%' limit ?2, ?3";
 
       let mut stmt = conn.prepare(stmt_str)?;
       let torrents = stmt

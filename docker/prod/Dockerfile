@@ -17,7 +17,8 @@ FROM alpine:3 as db_file_builder
 RUN apk add sqlite bash
 WORKDIR /app
 COPY ./data .
-RUN ./import_to_sqlite.sh
+WORKDIR /app/scripts
+RUN ./import_to_sqlite_fast.sh
 
 FROM $RUST_BUILDER_IMAGE as chef
 USER root
