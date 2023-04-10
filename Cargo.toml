@@ -5,18 +5,18 @@ authors = ["Heretic <tylerjobsearch06@gmx.com>"]
 edition = "2018"
 
 [dependencies]
-actix-web = "4.3.0"
+actix-web = "4.3.1"
 actix-files = "0.6.2"
 env_logger = "0.10.0"
 
-serde = "1.0.152"
-serde_json = "1.0.91"
-serde_derive = "1.0.152"
+serde = "1.0.159"
+serde_json = "1.0.95"
+serde_derive = "1.0.159"
 
-anyhow = "1.0.68"
+anyhow = "1.0.70"
 
 tokio-rusqlite = "0.3.0"
-tokio = { version = "1.25.0", features = ["full"] }
+tokio = { version = "1.27.0", features = ["full"] }
 
 [dependencies.rusqlite]
 version = "0.28.0"
