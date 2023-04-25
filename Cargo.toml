@@ -9,15 +9,15 @@ actix-web = "4.3.1"
 actix-files = "0.6.2"
 env_logger = "0.10.0"
 
-serde = "1.0.159"
-serde_json = "1.0.95"
-serde_derive = "1.0.159"
+serde = "1.0.160"
+serde_json = "1.0.96"
+serde_derive = "1.0.160"
 
 anyhow = "1.0.70"
 
-tokio-rusqlite = "0.3.0"
+tokio-rusqlite = "0.4.0"
 tokio = { version = "1.27.0", features = ["full"] }
 
 [dependencies.rusqlite]
-version = "0.28.0"
+version = "0.29.0"
 features = ["bundled"]
