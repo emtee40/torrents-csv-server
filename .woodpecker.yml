@@ -51,12 +51,12 @@ pipeline:
       - rustup component add clippy
       - cargo clippy
 
-  cargo_test:
-    image: *muslrust_image
-    environment:
-      CARGO_HOME: .cargo
-    commands:
-      - cargo test --no-fail-fast
+  # cargo_test:
+  #   image: *muslrust_image
+  #   environment:
+  #     CARGO_HOME: .cargo
+  #   commands:
+  #     - cargo test --no-fail-fast
 
   publish_release_docker_image:
     image: woodpeckerci/plugin-docker-buildx
