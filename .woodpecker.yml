@@ -7,6 +7,9 @@ variables:
 clone:
   git:
     image: woodpeckerci/plugin-git
+    settings:
+      depth: 50
+      lfs: false
 
 pipeline:
   # prepare_repo:
