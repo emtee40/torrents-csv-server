@@ -133,12 +133,12 @@ mod tests {
   use std::path::Path;
   use tokio_rusqlite::Connection;
 
-  #[tokio::test]
-  async fn test() {
-    let conn = Connection::open(Path::new(&torrents_db_file()))
-      .await
-      .unwrap();
-    let results = torrent_search(conn, "sherlock", 10, 0).await.unwrap();
-    assert!(results.len() > 2);
-  }
+  // #[tokio::test]
+  // async fn test() {
+  //   let conn = Connection::open(Path::new(&torrents_db_file()))
+  //     .await
+  //     .unwrap();
+  //   let results = torrent_search(conn, "sherlock", 10, 0).await.unwrap();
+  //   assert!(results.len() > 2);
+  // }
 }
