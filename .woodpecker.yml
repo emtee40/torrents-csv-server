@@ -10,6 +10,7 @@ clone:
     settings:
       depth: 50
       lfs: false
+      submodule_update_remote: false
 
 pipeline:
   # prepare_repo:
