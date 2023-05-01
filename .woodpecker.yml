@@ -4,6 +4,10 @@
 variables:
   - &muslrust_image 'clux/muslrust:stable'
 
+clone:
+  git:
+    image: woodpeckerci/plugin-git
+
 pipeline:
   # prepare_repo:
   #   image: alpine:3
