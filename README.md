@@ -4,9 +4,9 @@
 
 [Demo Server](https://torrents-csv.ml)
 
-`Torrents.csv` is a _collaborative_ repository of torrents and their files, consisting of a searchable `torrents.csv`, and `torrent_files.csv`. With it you can search for torrents, or files within torrents. It aims to be a universal file system for popular data.
+`Torrents.csv` is a _collaborative_ repository of torrents, consisting of a searchable `torrents.csv` file. It aims to be a universal file system for popular data.
 
-Its initially populated with a January 2017 backup of the pirate bay, and new torrents are periodically added from various torrents sites. It comes with a self-hostable [Torrents.csv webserver](https://torrents-csv.ml), a command line search, and a folder scanner to add torrents, and their files.
+Its initially populated with a January 2017 backup of the pirate bay, and new torrents are periodically added from various torrents sites. It comes with a self-hostable [Torrents.csv webserver](https://torrents-csv.ml), a command line search, and a folder scanner to add torrents.
 
 `Torrents.csv` will only store torrents with at least one seeder to keep the file small, will be periodically purged of non-seeded torrents, and sorted by infohash.
 
@@ -14,7 +14,7 @@ Its initially populated with a January 2017 backup of the pirate bay, and new to
 
 To request more torrents, or add your own, go [here](https://git.torrents-csv.ml/heretic/torrents-csv-data).
 
-Made with [Rust](https://www.rust-lang.org), [ripgrep](https://github.com/BurntSushi/ripgrep), [Actix](https://actix.rs/), [Inferno](https://www.infernojs.org), [Typescript](https://www.typescriptlang.org/).
+Made with [Rust](https://www.rust-lang.org), [ripgrep](https://github.com/BurntSushi/ripgrep), [Actix](https://actix.rs/), [Perseus](https://framesurge.sh/perseus/en-US/), and [Sycamore](https://sycamore-rs.netlify.app/).
 
 ## Webserver
 
@@ -24,10 +24,11 @@ Made with [Rust](https://www.rust-lang.org), [ripgrep](https://github.com/BurntS
 
 ```
 wget https://git.torrents-csv.ml/heretic/torrents-csv-server/raw/branch/main/docker/prod/docker-compose.yml
+wget https://git.torrents-csv.ml/heretic/torrents-csv-server/raw/branch/main/docker/prod/nginx.conf
 docker-compose up -d
 ```
 
-And goto http://localhost:8902
+And goto http://localhost:8904
 
 ### Docker Development
 
@@ -35,6 +36,7 @@ And goto http://localhost:8902
 git clone --recurse-submodules https://git.torrents-csv.ml/heretic/torrents-csv-server
 cd torrents-csv-server/docker/dev
 ./docker_update.sh
+# For the front end, check out http://git.torrents-csv.ml/heretic/torrents-csv-ui-perseus
 ```
 
 ## Command Line Searching
@@ -59,8 +61,8 @@ bleh season 1 (1993-)
 
 A JSON output of search results is available at:
 
-`http://localhost:8902/service/search?q=[QUERY]&size=[NUMBER_OF_RESULTS]&page=[PAGE]&type=[torrent | file]`
+`http://localhost:8904/service/search?q=[QUERY]&size=[NUMBER_OF_RESULTS]&page=[PAGE]`
 
 New torrents are at:
 
-`http://localhost:8902/service/new?size=[NUMBER_OF_RESULTS]&page=[PAGE]&type=[torrent | file]`
+`http://localhost:8904/service/new?size=[NUMBER_OF_RESULTS]&page=[PAGE]`

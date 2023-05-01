@@ -6,8 +6,6 @@ extern crate serde_json;
 extern crate serde_derive;
 extern crate rusqlite;
 
-use actix_files as fs;
-use actix_files::NamedFile;
 use actix_web::{middleware, web, App, HttpResponse, HttpServer};
 use anyhow::{anyhow, Result};
 use rusqlite::params;
@@ -25,22 +23,12 @@ async fn main() -> io::Result<()> {
   HttpServer::new(move || {
     App::new()
       .wrap(middleware::Logger::default())
-      .service(fs::Files::new("/static", front_end_dir()))
-      .route("/", web::get().to(index))
       .route("/service/search", web::get().to(search))
   })
   .keep_alive(None)
   .bind(endpoint())?
   .run()
   .await
-}
-
-async fn index() -> Result<NamedFile, actix_web::error::Error> {
-  Ok(NamedFile::open(front_end_dir() + "/index.html")?)
-}
-
-fn front_end_dir() -> String {
-  env::var("TORRENTS_CSV_FRONT_END_DIR").unwrap_or_else(|_| "./ui/dist".to_string())
 }
 
 fn torrents_db_file() -> String {

@@ -1,15 +1,4 @@
 ARG RUST_BUILDER_IMAGE=clux/muslrust:stable
-# Front end
-FROM node:alpine as node
-WORKDIR /app/ui
-
-# Cache deps
-COPY ui/package.json ui/yarn.lock ./
-RUN yarn install --pure-lockfile
-
-# Build the UI
-COPY ./ui /app/ui
-RUN yarn build
 
 # Build the torrents.db file
 FROM alpine:3 as db_file_builder
@@ -53,7 +42,6 @@ RUN addgroup -S myuser && adduser -S myuser -G myuser
   
 # Copy resources
 COPY --from=builder /app/torrents-csv-service /app/
-COPY --from=node /app/ui/dist /app/dist
 COPY --from=db_file_builder /app/torrents.db /app/torrents.db
 EXPOSE 8080
 USER myuser
