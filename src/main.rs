@@ -129,9 +129,9 @@ async fn torrent_search(
 
 #[cfg(test)]
 mod tests {
-  use crate::{torrent_search, torrents_db_file};
-  use std::path::Path;
-  use tokio_rusqlite::Connection;
+  // use crate::{torrent_search, torrents_db_file};
+  // use std::path::Path;
+  // use tokio_rusqlite::Connection;
 
   // #[tokio::test]
   // async fn test() {
