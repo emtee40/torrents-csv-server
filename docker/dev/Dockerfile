@@ -10,7 +10,7 @@ RUN ./import_to_sqlite_fast.sh
 
 FROM $RUST_BUILDER_IMAGE as chef
 USER root
-RUN cargo install cargo-chef
+RUN cargo install cargo-chef --locked
 WORKDIR /app
 
 # Chef plan
