@@ -13,22 +13,29 @@ use actix_web::{
   HttpServer,
 };
 use anyhow::{anyhow, Result};
+use r2d2::{Pool, PooledConnection};
+use r2d2_sqlite_pool::SqliteConnectionManager;
 use rusqlite::params;
-use std::{cmp, env, io, ops::Deref, path::Path};
+use std::{cmp, env, io, ops::Deref};
 use tokio::sync::Mutex;
-use tokio_rusqlite::Connection;
 use uuid::Uuid;
 
 const DEFAULT_SIZE: usize = 25;
 
+type Conn = PooledConnection<SqliteConnectionManager>;
+
 struct MyAppData {
   etag: String,
+  pool: Pool<SqliteConnectionManager>,
 }
 
 #[actix_web::main]
 async fn main() -> io::Result<()> {
+  let manager = SqliteConnectionManager::file(torrents_db_file());
+  let pool = r2d2::Pool::new(manager).unwrap();
   let my_app_data = Data::new(Mutex::new(MyAppData {
     etag: Uuid::new_v4().to_string(),
+    pool,
   }));
   println!("Access me at {}", endpoint());
   std::env::set_var("RUST_LOG", "actix_web=debug");
@@ -68,11 +75,8 @@ async fn search(
 ) -> Result<HttpResponse, actix_web::Error> {
   let my_app_data = data.lock().await;
   let etag = my_app_data.etag.clone();
-  let conn = Connection::open(Path::new(&torrents_db_file()))
-    .await
-    .map_err(actix_web::error::ErrorBadRequest)?;
+  let conn = my_app_data.pool.get().unwrap();
   let res = search_query(query, conn)
-    .await
     .map(|body| {
       HttpResponse::Ok()
         .append_header(("Access-Control-Allow-Origin", "*"))
@@ -84,7 +88,7 @@ async fn search(
   Ok(res)
 }
 
-async fn search_query(query: web::Query<SearchQuery>, conn: Connection) -> Result<Vec<Torrent>> {
+fn search_query(query: web::Query<SearchQuery>, conn: Conn) -> Result<Vec<Torrent>> {
   let q = query.q.trim();
   if q.is_empty() || q.len() < 3 || q == "2020" {
     return Err(anyhow!("{{\"error\": \"{}\"}}", "Empty query".to_string()));
@@ -97,7 +101,7 @@ async fn search_query(query: web::Query<SearchQuery>, conn: Connection) -> Resul
 
   println!("query = {q}, type = {type_}, page = {page}, size = {size}");
 
-  torrent_search(conn, q, size, offset).await
+  torrent_search(conn, q, size, offset)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -112,39 +116,27 @@ struct Torrent {
   scraped_date: u32,
 }
 
-async fn torrent_search(
-  conn: Connection,
-  query: &str,
-  size: usize,
-  offset: usize,
-) -> Result<Vec<Torrent>> {
+fn torrent_search(conn: Conn, query: &str, size: usize, offset: usize) -> Result<Vec<Torrent>> {
   let q = query.to_owned();
-  let res = conn
-    .call(move |conn| {
-      let stmt_str = "select * from torrent where name like '%' || ?1 || '%' limit ?2, ?3";
+  let stmt_str = "select * from torrent where name like '%' || ?1 || '%' limit ?2, ?3";
+  let mut stmt = conn.prepare(stmt_str)?;
+  let torrents = stmt
+    .query_map(
+      params![q.replace(' ', "%"), offset.to_string(), size.to_string(),],
+      |row| {
+        Ok(Torrent {
+          infohash: row.get(0)?,
+          name: row.get(1)?,
+          size_bytes: row.get(2)?,
+          created_unix: row.get(3)?,
+          seeders: row.get(4)?,
+          leechers: row.get(5)?,
+          completed: row.get(6)?,
+          scraped_date: row.get(7)?,
+        })
+      },
+    )?
+    .collect::<Result<Vec<Torrent>, rusqlite::Error>>()?;
 
-      let mut stmt = conn.prepare(stmt_str)?;
-      let torrents = stmt
-        .query_map(
-          params![q.replace(' ', "%"), offset.to_string(), size.to_string(),],
-          |row| {
-            Ok(Torrent {
-              infohash: row.get(0)?,
-              name: row.get(1)?,
-              size_bytes: row.get(2)?,
-              created_unix: row.get(3)?,
-              seeders: row.get(4)?,
-              leechers: row.get(5)?,
-              completed: row.get(6)?,
-              scraped_date: row.get(7)?,
-            })
-          },
-        )?
-        .collect::<Result<Vec<Torrent>, rusqlite::Error>>()?;
-
-      Ok::<_, rusqlite::Error>(torrents)
-    })
-    .await?;
-
-  Ok(res)
+  Ok(torrents)
 }
