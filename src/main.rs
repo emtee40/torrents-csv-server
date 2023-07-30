@@ -5,23 +5,38 @@ extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 extern crate rusqlite;
-
-use actix_web::{middleware, web, App, HttpResponse, HttpServer};
+use actix_web::{
+  middleware,
+  web::{self, Data},
+  App,
+  HttpResponse,
+  HttpServer,
+};
 use anyhow::{anyhow, Result};
 use rusqlite::params;
 use std::{cmp, env, io, ops::Deref, path::Path};
+use tokio::sync::Mutex;
 use tokio_rusqlite::Connection;
+use uuid::Uuid;
 
 const DEFAULT_SIZE: usize = 25;
 
+struct MyAppData {
+  etag: String,
+}
+
 #[actix_web::main]
 async fn main() -> io::Result<()> {
+  let my_app_data = Data::new(Mutex::new(MyAppData {
+    etag: Uuid::new_v4().to_string(),
+  }));
   println!("Access me at {}", endpoint());
   std::env::set_var("RUST_LOG", "actix_web=debug");
   env_logger::init();
 
   HttpServer::new(move || {
     App::new()
+      .app_data(Data::clone(&my_app_data))
       .wrap(middleware::Logger::default())
       .route("/service/search", web::get().to(search))
   })
@@ -47,7 +62,12 @@ struct SearchQuery {
   type_: Option<String>,
 }
 
-async fn search(query: web::Query<SearchQuery>) -> Result<HttpResponse, actix_web::Error> {
+async fn search(
+  query: web::Query<SearchQuery>,
+  data: Data<Mutex<MyAppData>>,
+) -> Result<HttpResponse, actix_web::Error> {
+  let my_app_data = data.lock().await;
+  let etag = my_app_data.etag.clone();
   let conn = Connection::open(Path::new(&torrents_db_file()))
     .await
     .map_err(actix_web::error::ErrorBadRequest)?;
@@ -56,6 +76,8 @@ async fn search(query: web::Query<SearchQuery>) -> Result<HttpResponse, actix_we
     .map(|body| {
       HttpResponse::Ok()
         .append_header(("Access-Control-Allow-Origin", "*"))
+        .append_header(("Cache-Control", "public, max-age=86400"))
+        .append_header(("ETag", etag))
         .json(body)
     })
     .map_err(actix_web::error::ErrorBadRequest)?;
@@ -125,20 +147,4 @@ async fn torrent_search(
     .await?;
 
   Ok(res)
-}
-
-#[cfg(test)]
-mod tests {
-  // use crate::{torrent_search, torrents_db_file};
-  // use std::path::Path;
-  // use tokio_rusqlite::Connection;
-
-  // #[tokio::test]
-  // async fn test() {
-  //   let conn = Connection::open(Path::new(&torrents_db_file()))
-  //     .await
-  //     .unwrap();
-  //   let results = torrent_search(conn, "sherlock", 10, 0).await.unwrap();
-  //   assert!(results.len() > 2);
-  // }
 }
