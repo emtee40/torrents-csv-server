@@ -16,7 +16,7 @@ use anyhow::{anyhow, Result};
 use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite_pool::SqliteConnectionManager;
 use rusqlite::params;
-use std::{cmp, env, io, ops::Deref};
+use std::{cmp, env, io, ops::Deref, time::Duration};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -32,7 +32,13 @@ struct MyAppData {
 #[actix_web::main]
 async fn main() -> io::Result<()> {
   let manager = SqliteConnectionManager::file(torrents_db_file());
-  let pool = r2d2::Pool::new(manager).unwrap();
+  let lifetime = Duration::from_secs(10);
+  let pool = r2d2::Pool::builder()
+    .max_lifetime(Some(lifetime))
+    .idle_timeout(Some(lifetime))
+    .connection_timeout(lifetime)
+    .build(manager)
+    .unwrap();
   let my_app_data = Data::new(Mutex::new(MyAppData {
     etag: Uuid::new_v4().to_string(),
     pool,
@@ -47,7 +53,6 @@ async fn main() -> io::Result<()> {
       .wrap(middleware::Logger::default())
       .route("/service/search", web::get().to(search))
   })
-  .keep_alive(None)
   .bind(endpoint())?
   .run()
   .await
