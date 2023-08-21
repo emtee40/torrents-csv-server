@@ -16,7 +16,7 @@ use anyhow::{anyhow, Result};
 use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite_pool::SqliteConnectionManager;
 use rusqlite::params;
-use std::{cmp, env, io, ops::Deref, time::Duration};
+use std::{cmp, env, io, time::Duration};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -71,7 +71,6 @@ struct SearchQuery {
   q: String,
   page: Option<usize>,
   size: Option<usize>,
-  type_: Option<String>,
 }
 
 async fn search(
@@ -80,7 +79,10 @@ async fn search(
 ) -> Result<HttpResponse, actix_web::Error> {
   let my_app_data = data.lock().await;
   let etag = my_app_data.etag.clone();
-  let conn = my_app_data.pool.get().unwrap();
+  let conn = my_app_data
+    .pool
+    .get()
+    .map_err(actix_web::error::ErrorBadRequest)?;
   let res = search_query(query, conn)
     .map(|body| {
       HttpResponse::Ok()
@@ -101,10 +103,9 @@ fn search_query(query: web::Query<SearchQuery>, conn: Conn) -> Result<Vec<Torren
 
   let page = query.page.unwrap_or(1);
   let size = cmp::min(100, query.size.unwrap_or(DEFAULT_SIZE));
-  let type_ = query.type_.as_ref().map_or("torrent", String::deref);
   let offset = size * (page - 1);
 
-  println!("query = {q}, type = {type_}, page = {page}, size = {size}");
+  println!("query = {q}, page = {page}, size = {size}");
 
   torrent_search(conn, q, size, offset)
 }
