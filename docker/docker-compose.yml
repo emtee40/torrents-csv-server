@@ -9,4 +9,3 @@ services:
     environment:
       TORRENTS_CSV_DB_FILE: /app/torrents.db 
       TORRENTS_CSV_FRONT_END_DIR: /app/dist
-# You should run perseus locally to test
