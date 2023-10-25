@@ -23,8 +23,8 @@ Made with [Rust](https://www.rust-lang.org), [ripgrep](https://github.com/BurntS
 ### Docker
 
 ```
-wget https://git.torrents-csv.ml/heretic/torrents-csv-server/raw/branch/main/docker/prod/docker-compose.yml
-wget https://git.torrents-csv.ml/heretic/torrents-csv-server/raw/branch/main/docker/prod/nginx.conf
+wget https://git.torrents-csv.ml/heretic/torrents-csv-server/raw/branch/main/docker/docker-compose.yml
+wget https://git.torrents-csv.ml/heretic/torrents-csv-server/raw/branch/main/docker/nginx.conf
 docker-compose up -d
 ```
 
