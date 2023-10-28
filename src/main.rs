@@ -17,13 +17,13 @@ use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite_pool::SqliteConnectionManager;
 use rusqlite::params;
 use std::{cmp, env, io, time::Duration};
-use tokio::sync::Mutex;
 use uuid::Uuid;
 
 const DEFAULT_SIZE: usize = 25;
 
 type Conn = PooledConnection<SqliteConnectionManager>;
 
+#[derive(Clone)]
 struct MyAppData {
   etag: String,
   pool: Pool<SqliteConnectionManager>,
@@ -39,17 +39,18 @@ async fn main() -> io::Result<()> {
     .connection_timeout(lifetime)
     .build(manager)
     .unwrap();
-  let my_app_data = Data::new(Mutex::new(MyAppData {
+
+  let my_app_data = MyAppData {
     etag: Uuid::new_v4().to_string(),
     pool,
-  }));
+  };
   println!("Access me at {}", endpoint());
   std::env::set_var("RUST_LOG", "actix_web=debug");
   env_logger::init();
 
   HttpServer::new(move || {
     App::new()
-      .app_data(Data::clone(&my_app_data))
+      .app_data(Data::new(my_app_data.clone()))
       .wrap(middleware::Logger::default())
       .route("/service/search", web::get().to(search))
   })
@@ -75,24 +76,24 @@ struct SearchQuery {
 
 async fn search(
   query: web::Query<SearchQuery>,
-  data: Data<Mutex<MyAppData>>,
+  data: Data<MyAppData>,
 ) -> Result<HttpResponse, actix_web::Error> {
-  let my_app_data = data.lock().await;
-  let etag = my_app_data.etag.clone();
-  let conn = my_app_data
-    .pool
-    .get()
+  let etag = data.etag.clone();
+  let conn = web::block(move || data.pool.get())
+    .await?
     .map_err(actix_web::error::ErrorBadRequest)?;
-  let res = search_query(query, conn)
-    .map(|body| {
-      HttpResponse::Ok()
-        .append_header(("Access-Control-Allow-Origin", "*"))
-        .append_header(("Cache-Control", "public, max-age=86400"))
-        .append_header(("ETag", etag))
-        .json(body)
-    })
+
+  let body = web::block(move || search_query(query, conn))
+    .await?
     .map_err(actix_web::error::ErrorBadRequest)?;
-  Ok(res)
+
+  Ok(
+    HttpResponse::Ok()
+      .append_header(("Access-Control-Allow-Origin", "*"))
+      .append_header(("Cache-Control", "public, max-age=86400"))
+      .append_header(("ETag", etag))
+      .json(body),
+  )
 }
 
 fn search_query(query: web::Query<SearchQuery>, conn: Conn) -> Result<Vec<Torrent>> {
