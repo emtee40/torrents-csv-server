@@ -16,7 +16,7 @@ use anyhow::{anyhow, Result};
 use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite_pool::SqliteConnectionManager;
 use rusqlite::params;
-use std::{cmp, env, io, time::Duration};
+use std::{cmp, env, io};
 use uuid::Uuid;
 
 const DEFAULT_SIZE: usize = 25;
@@ -32,13 +32,7 @@ struct MyAppData {
 #[actix_web::main]
 async fn main() -> io::Result<()> {
   let manager = SqliteConnectionManager::file(torrents_db_file());
-  let lifetime = Duration::from_secs(10);
-  let pool = r2d2::Pool::builder()
-    .max_lifetime(Some(lifetime))
-    .idle_timeout(Some(lifetime))
-    .connection_timeout(lifetime)
-    .build(manager)
-    .unwrap();
+  let pool = r2d2::Pool::builder().build(manager).unwrap();
 
   let my_app_data = MyAppData {
     etag: Uuid::new_v4().to_string(),
