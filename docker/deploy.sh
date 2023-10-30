@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Rebuilding docker
-sudo docker build ../ --file Dockerfile --build-arg RUST_RELEASE_MODE=release -t torrents-csv-server:latest -t dessalines/torrents-csv-server:latest
+sudo docker build ../ --file Dockerfile -t torrents-csv-server:latest -t dessalines/torrents-csv-server:latest
 sudo docker push dessalines/torrents-csv-server:latest
 
 # SSH and pull it

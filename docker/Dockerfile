@@ -1,5 +1,4 @@
 ARG RUST_VERSION=1.73
-ARG RUST_RELEASE_MODE=debug
 ARG DISTROLESS_IMAGE=gcr.io/distroless/cc-debian12
 
 # Build the torrents.db file
@@ -19,33 +18,21 @@ COPY ./src src
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef as builder
-ARG RUST_RELEASE_MODE
-
 COPY --from=planner /app/recipe.json ./recipe.json
 
 # Cargo chef cook
-RUN set -ex; \
-  if [ "${RUST_RELEASE_MODE}" = "debug" ]; then \
-    cargo chef cook --recipe-path recipe.json; \
-  else \
-    cargo chef cook --release --recipe-path recipe.json; \
-  fi
+RUN cargo chef cook --release --recipe-path recipe.json
 
 COPY ./Cargo.toml ./Cargo.lock ./
 COPY ./src src
 
 # Cargo build
-RUN set -ex; \
-  if [ "${RUST_RELEASE_MODE}" = "debug" ]; then \
-    cargo build; \
-  else \
-    cargo build --release; \
-  fi
+RUN cargo build --release
 
 # reduce binary size
-RUN strip ./target/$RUST_RELEASE_MODE/torrents-csv-service
+RUN strip ./target/release/torrents-csv-service
 
-RUN cp ./target/$RUST_RELEASE_MODE/torrents-csv-service /app/torrents-csv-service
+RUN cp ./target/release/torrents-csv-service /app/torrents-csv-service
 
 # The runner
 FROM $DISTROLESS_IMAGE
