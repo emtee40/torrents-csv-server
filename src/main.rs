@@ -96,7 +96,7 @@ fn search_query(query: web::Query<SearchQuery>, conn: Conn) -> Result<Vec<Torren
     return Err(anyhow!("{{\"error\": \"{}\"}}", "Empty query".to_string()));
   }
 
-  let page = query.page.unwrap_or(1);
+  let page = cmp::min(20, query.page.unwrap_or(1));
   let size = cmp::min(100, query.size.unwrap_or(DEFAULT_SIZE));
   let offset = size * (page - 1);
 
