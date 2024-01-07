@@ -36,7 +36,7 @@ RUN cp ./target/release/torrents-csv-service /app/torrents-csv-service
 
 # The runner
 FROM $DISTROLESS_IMAGE
-  
+
 # Copy resources
 COPY --from=builder /app/torrents-csv-service /app/
 COPY --from=db_file_builder /app/torrents.db /app/torrents.db
