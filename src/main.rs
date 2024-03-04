@@ -6,13 +6,14 @@ extern crate serde_json;
 extern crate serde_derive;
 extern crate rusqlite;
 use actix_web::{
+  error::ErrorBadRequest,
   middleware,
   web::{self, Data},
   App,
+  Error,
   HttpResponse,
   HttpServer,
 };
-use anyhow::{anyhow, Result};
 use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite_pool::SqliteConnectionManager;
 use rusqlite::params;
@@ -29,18 +30,38 @@ struct MyAppData {
   pool: Pool<SqliteConnectionManager>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct Torrent {
+  infohash: String,
+  name: String,
+  size_bytes: isize,
+  created_unix: u32,
+  seeders: u32,
+  leechers: u32,
+  completed: Option<u32>,
+  scraped_date: u32,
+}
+
+#[derive(Deserialize)]
+struct SearchQuery {
+  q: String,
+  page: Option<usize>,
+  size: Option<usize>,
+}
+
 #[actix_web::main]
 async fn main() -> io::Result<()> {
-  let manager = SqliteConnectionManager::file(torrents_db_file());
-  let pool = r2d2::Pool::builder().build(manager).unwrap();
-
   let my_app_data = MyAppData {
     etag: Uuid::new_v4().to_string(),
-    pool,
+    pool: r2d2::Pool::builder()
+      .build(SqliteConnectionManager::file(torrents_db_file()))
+      .unwrap(),
   };
-  println!("Access me at {}", endpoint());
+
   std::env::set_var("RUST_LOG", "actix_web=debug");
   env_logger::init();
+
+  println!("Access me at {}", endpoint());
 
   HttpServer::new(move || {
     App::new()
@@ -61,25 +82,18 @@ fn endpoint() -> String {
   env::var("TORRENTS_CSV_ENDPOINT").unwrap_or_else(|_| "0.0.0.0:8902".to_string())
 }
 
-#[derive(Deserialize)]
-struct SearchQuery {
-  q: String,
-  page: Option<usize>,
-  size: Option<usize>,
-}
-
 async fn search(
   query: web::Query<SearchQuery>,
   data: Data<MyAppData>,
-) -> Result<HttpResponse, actix_web::Error> {
+) -> Result<HttpResponse, Error> {
   let etag = data.etag.clone();
   let conn = web::block(move || data.pool.get())
     .await?
-    .map_err(actix_web::error::ErrorBadRequest)?;
+    .map_err(ErrorBadRequest)?;
 
   let body = web::block(move || search_query(query, conn))
     .await?
-    .map_err(actix_web::error::ErrorBadRequest)?;
+    .map_err(ErrorBadRequest)?;
 
   Ok(
     HttpResponse::Ok()
@@ -90,10 +104,13 @@ async fn search(
   )
 }
 
-fn search_query(query: web::Query<SearchQuery>, conn: Conn) -> Result<Vec<Torrent>> {
+fn search_query(
+  query: web::Query<SearchQuery>,
+  conn: Conn,
+) -> Result<Vec<Torrent>, rusqlite::Error> {
   let q = query.q.trim();
-  if q.is_empty() || q.len() < 3 || q == "2020" {
-    return Err(anyhow!("{{\"error\": \"{}\"}}", "Empty query".to_string()));
+  if q.is_empty() || q.len() < 3 {
+    return Err(rusqlite::Error::InvalidQuery);
   }
 
   let page = cmp::min(20, query.page.unwrap_or(1));
@@ -105,25 +122,21 @@ fn search_query(query: web::Query<SearchQuery>, conn: Conn) -> Result<Vec<Torren
   torrent_search(conn, q, size, offset)
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct Torrent {
-  infohash: String,
-  name: String,
-  size_bytes: isize,
-  created_unix: u32,
-  seeders: u32,
-  leechers: u32,
-  completed: Option<u32>,
-  scraped_date: u32,
-}
-
-fn torrent_search(conn: Conn, query: &str, size: usize, offset: usize) -> Result<Vec<Torrent>> {
-  let q = query.to_owned();
+fn torrent_search(
+  conn: Conn,
+  query: &str,
+  size: usize,
+  offset: usize,
+) -> Result<Vec<Torrent>, rusqlite::Error> {
   let stmt_str = "select * from torrent where name like '%' || ?1 || '%' limit ?2, ?3";
   let mut stmt = conn.prepare(stmt_str)?;
   let torrents = stmt
     .query_map(
-      params![q.replace(' ', "%"), offset.to_string(), size.to_string(),],
+      params![
+        query.replace(' ', "%"),
+        offset.to_string(),
+        size.to_string(),
+      ],
       |row| {
         Ok(Torrent {
           infohash: row.get(0)?,
